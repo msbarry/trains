@@ -21,7 +21,8 @@ function initialize() {
   var conversion = 0.00044704;
   var mapOptions = {
     zoom: 13,
-    center: new google.maps.LatLng(42.351944, -71.055278)
+    center: new google.maps.LatLng(42.351944, -71.055278),
+    streetViewControl: false
   }
   var map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
   var transitLayer = new google.maps.TransitLayer();
