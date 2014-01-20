@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Where's My Train?">
+    <title>Where's my Train?</title>
+    <style>
+      html, body, #map-canvas {
+        height: 100%;
+        margin: 0px;
+        padding: 0px
+      }
+    </style>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js" type="text/javascript"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script>
+    <script>
+function initialize() {
+  var conversion = 0.00044704;
+  var mapOptions = {
+    zoom: 13,
+    center: new google.maps.LatLng(42.351944, -71.055278)
+  }
+  var map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
+  var transitLayer = new google.maps.TransitLayer();
+  transitLayer.setMap(map);
+  var markers = [];
+  var positions = [];
+  setTimeout(function () {
+    var coords = localStorage.getItem('coords');
+    if (coords) {
+      var deser = JSON.parse(coords);
+      map.setCenter(new google.maps.LatLng(deser.latitude, deser.longitude));
+    }
+  });
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      if (pos.coords) {
+        map.setCenter(new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
+        localStorage.setItem('coords', JSON.stringify(pos.coords));
+      }
+    });
+  }
+
+  function draw () {
+    markers.forEach(function (m) {
+      m.setMap(null);
+    })
+    markers = [];
+    var now = new Date().getTime();
+    positions.forEach(function (pos) {
+      markers.push(new google.maps.Marker({
+        map: map,
+        icon: {
+          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+          scale: 3,
+          rotation: pos.heading
+        },
+        clickable: false,
+        draggable: false,
+        position: pos.pos
+      }));
+    });
+  };
+
+  (function poll () {
+    var urls = [];
+    for (var i = 1; i <= 12; i++) {
+      urls.push(encodeURIComponent("urls[]") + '=' + encodeURIComponent('http://developer.mbta.com/lib/RTCR/RailLine_' + i + '.json'));
+    }
+    urls.push(encodeURIComponent("urls[]") + '=' + encodeURIComponent('http://developer.mbta.com/lib/rthr/red.json'));
+    urls.push(encodeURIComponent("urls[]") + '=' + encodeURIComponent('http://developer.mbta.com/lib/rthr/orange.json'));
+    urls.push(encodeURIComponent("urls[]") + '=' + encodeURIComponent('http://developer.mbta.com/lib/rthr/blue.json'));
+    var url = 'http://jsonpwrapper.com/?callback=?&' + urls.join("&");
+    $.getJSON(url, function (data) {
+      positions = [];
+      data.forEach(function (response) {
+        var body = JSON.parse(response.body);
+        if (body.Messages) {
+          // commuter rail
+          body.Messages.forEach(function (msg) {
+            if (msg.Latitude && msg.Longitude) {
+              positions.push({
+                pos: new google.maps.LatLng(+msg.Latitude, +msg.Longitude),
+                heading: +msg.Heading,
+                speed: +msg.Speed,
+                time: (+msg.TimeStamp) * 1000
+              });
+            }
+          });
+        } else if (body.TripList) {
+          // subway
+          body.TripList.Trips.forEach(function (trip) {
+            if (trip && trip.Position && trip.Position.Lat && trip.Position.Long) {
+              var msg = trip.Position;
+              positions.push({
+                pos: new google.maps.LatLng(+msg.Lat, +msg.Long),
+                heading: +msg.Heading,
+                speed: 0,
+                time: (+msg.Timestamp) * 1000
+              });
+            }
+          });
+        }
+      });
+      draw();
+    });
+    setTimeout(poll, 30000);
+  })();
+}
+
+$(initialize);
+
+    </script>
+  </head>
+  <body>
+    <div id="map-canvas"></div>
+  </body>
+</html>
