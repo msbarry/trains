@@ -28,7 +28,7 @@ function initialize() {
   var transitLayer = new google.maps.TransitLayer();
   transitLayer.setMap(map);
   var markers = [];
-  var positions = [];
+  var positions = {};
   setTimeout(function () {
     var coords = localStorage.getItem('coords');
     if (coords) {
@@ -47,12 +47,11 @@ function initialize() {
   }
 
   function draw () {
-    markers.forEach(function (m) {
-      m.setMap(null);
-    })
+    var oldmarkers = markers;
     markers = [];
     var now = new Date().getTime();
-    positions.forEach(function (pos) {
+    Object.keys(positions).forEach(function (key) {
+      var pos = positions[key];
       markers.push(new google.maps.Marker({
         map: map,
         icon: {
@@ -64,6 +63,9 @@ function initialize() {
         draggable: false,
         position: pos.pos
       }));
+    });
+    oldmarkers.forEach(function (m) {
+      m.setMap(null);
     });
   };
 
@@ -84,12 +86,12 @@ function initialize() {
           // commuter rail
           body.Messages.forEach(function (msg) {
             if (msg.Latitude && msg.Longitude) {
-              positions.push({
+              positions[msg.Vehicle] = {
                 pos: new google.maps.LatLng(+msg.Latitude, +msg.Longitude),
                 heading: +msg.Heading,
                 speed: +msg.Speed,
                 time: (+msg.TimeStamp) * 1000
-              });
+              };
             }
           });
         } else if (body.TripList) {
@@ -97,12 +99,12 @@ function initialize() {
           body.TripList.Trips.forEach(function (trip) {
             if (trip && trip.Position && trip.Position.Lat && trip.Position.Long) {
               var msg = trip.Position;
-              positions.push({
+              positions[trip.TripID] = {
                 pos: new google.maps.LatLng(+msg.Lat, +msg.Long),
                 heading: +msg.Heading,
                 speed: 0,
                 time: (+msg.Timestamp) * 1000
-              });
+              };
             }
           });
         }
